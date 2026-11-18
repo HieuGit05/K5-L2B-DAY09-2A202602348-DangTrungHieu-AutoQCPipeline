@@ -96,4 +96,14 @@ nhưng 2 seed và 100 ảnh test chưa đủ để khẳng định. Toàn bộ c
 - *Một lần AI sai:* bản đầu `label_format` đặt tên biến viết tắt (`cx, cy, w, h, stem`), khó đọc và khó giải thích; mình yêu cầu đổi sang `center_x`, `box_width`, `image_name`…
   Ngoài ra nếu chỉ nhìn bảng sweep thì F1 cao nhất ở `phash_dist = 16`; phải đo trên raw và mở ảnh mới thấy 16 xoá nhầm ảnh.
 
+## Thưởng: check mới `aspect_ratio` (box lệch tỉ lệ khung hình)
+`pipeline/checks/aspect_ratio.py` + `tests/test_aspect_ratio.py` (9 test xanh; `pytest` tổng 88/88). Cảnh báo `BOX_ODD_ASPECT` khi cạnh dài / cạnh ngắn
+(tính theo **pixel**) > 5.0, kèm `touches_edge` (box chạm mép ảnh, có thể là vật bị cắt). Chạy: `python -m pipeline.checks.aspect_ratio data/raw`.
+- **Chọn ngưỡng:** nhãn người của calib có tỉ lệ lớn nhất 4.0 → ngưỡng 5.0 cho **0 cờ trên calib** (39 ảnh, 115 box); trên raw cờ **11/719 box**.
+- **Kết quả (mở xem bằng `viz_labels.py`):** 9/11 box chạm mép là người bị cắt khung (hợp lệ, vd. `img_0042:5`). Trong 2 box không chạm mép,
+  `img_0062:1` là **lỗi thật**: box bao cả người lẫn bóng phản chiếu dưới nước (cao gấp đôi); `img_0091:8` là người bị che khuất (hợp lệ).
+  Sau khi người duyệt sửa `img_0062`, model vẫn coi bóng nước là người (`POSSIBLE_MISSING` conf 0.64 ở v3): thêm bằng chứng model có thể sai.
+- **Vì sao chưa gắn vào `make run`:** `pipeline/checks/__init__.py` và `configs/pipeline.yaml` bị ghim (không được sửa), nên check chạy riêng;
+  ngưỡng đọc `cfg["aspect_ratio"]["max_ratio"]` nếu có, mặc định là hằng số có tên `DEFAULT_MAX_RATIO`. Nhờ vậy báo cáo pipeline và kết quả train không đổi.
+
 *(Thưởng CVAT: không làm.)*
