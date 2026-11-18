@@ -59,7 +59,30 @@ Gate đếm lỗi bắt buộc trên mọi ảnh, kể cả ảnh đã duyệt: 
    (chỉ được cứu nhờ `POSSIBLE_MISSING` + người duyệt). `img_0030` dòng 9 bị `clip_box` còn rộng ~10 px.
 
 ## 5. Train: raw vs clean (tùy chọn, chấm riêng)
-**Chưa chạy.** Lý do: ưu tiên hoàn thành phần lõi (4 module, calibration, báo cáo) trong buổi lab; train Colab là phần tùy chọn, sẽ làm sau nếu còn thời gian.
+Colab T4, `scripts/train_compare.py`: yolo26n.pt, 20 epoch, imgsz 640, batch 16, seed 0 và 1; cùng val (`gold_val`, 40 ảnh) và cùng test (100 ảnh).
+`manifest_sha1 = 4975b2b…` khớp export đã push; `config_sha1 = 58d1755…` khớp `08_summary.json`. Bảng từ `submission/results/comparison.md`:
+
+| biến thể | #ảnh train | số seed | map50 (TB ± độ lệch) | map50_95 (TB ± độ lệch) | precision (TB ± độ lệch) | recall (TB ± độ lệch) |
+|---|---|---|---|---|---|---|
+| raw | 224 | 2 | 0.726 ± 0.000 | 0.512 ± 0.004 | 0.764 ± 0.061 | 0.649 ± 0.028 |
+| clean | 202 | 2 | 0.701 ± 0.025 | 0.487 ± 0.008 | 0.759 ± 0.003 | 0.625 ± 0.019 |
+
+Chênh mAP50 (clean − raw) = **−0.025**. AP50 theo lớp (TB 2 seed): car 0.738 → 0.738, person 0.822 → 0.823, bus 0.695 → 0.703, **truck 0.648 → 0.538**.
+
+**Kết luận (trung thực): chưa kết luận được clean tốt hơn raw.** Chênh mAP50 −0.025 bằng đúng độ lệch giữa 2 seed của clean (0.683 và 0.718), tức nằm trong nhiễu;
+raw có độ lệch 0.000 chỉ là trùng hợp của 2 seed, không phải raw ổn định hơn. mAP50-95 thấp hơn 0.025 (≈ 3× độ lệch), gợi ý raw nhỉnh hơn nhẹ,
+nhưng 2 seed và 100 ảnh test chưa đủ để khẳng định. Toàn bộ chênh lệch đến từ lớp **truck**; 3 lớp còn lại gần như bằng nhau.
+
+**Giả thuyết và cách kiểm:**
+1. **Rò rỉ test thổi phồng raw:** raw chứa 5 ảnh trùng tập test (`test_009, 033, 039, 044, 085`, `01_intake`), model raw đã "thấy" 5/100 ảnh test lúc train.
+   Kiểm: đánh giá lại cả hai model trên test bỏ 5 ảnh đó.
+2. **Truck ít mẫu nên nhiễu lớn:** test chỉ có 24 box truck, train có 32 (raw) / 41 (clean). Clean có nhiều truck hơn và ít car hơn (122 → 101),
+   do người duyệt sửa car↔truck. Vài dự đoán đổi là AP truck dao động mạnh. Kiểm: chạy ≥ 5 seed; xem AP truck từng seed; mở ảnh test có truck.
+3. **Clean vẫn còn nhãn nhiễu:** 38 ảnh còn cảnh báo chưa ai duyệt (mục 1), chủ yếu LOOSE_BOX/FALSE_POS. Ngoài ra Ultralytics tự bỏ dòng hỏng của raw khi train,
+   nên lợi thế "sạch cú pháp" của clean nhỏ hơn mong đợi. Kiểm: thêm biến thể `oracle` (nhãn người, chặn trên) để xem dữ liệu sạch hơn có thật sự giúp không.
+4. **Clean ít ảnh hơn (202 so với 224):** 13 ảnh trùng bị loại gần như không mang thông tin mới, nhưng vẫn là thêm lượt nhìn cho model.
+
+**Việc tiếp theo:** đánh giá lại trên test bỏ 5 ảnh rò rỉ; tăng lên ≥ 5 seed; chạy `oracle`; duyệt nốt 38 ảnh còn cảnh báo rồi train lại.
 
 ## 6. Quyết định và ghi chú AI
 **(a)** Quyết định: **Hold**. Không còn lỗi bắt buộc, nhưng 38/202 ảnh còn cảnh báo chưa ai xem.
